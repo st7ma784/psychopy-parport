@@ -1,7 +1,7 @@
 # Run via ./run.sh, which fills in LP_GID / DISPLAY and picks the service.
 x-common: &common
   build: .
-  image: psychopy-parport:latest
+  image: ${IMAGE:-psychopy-parport:latest}   # IMAGE=<user>/psychopy-parport to use Docker Hub
   group_add:
     - "${LP_GID:-7}"               # host gid owning /dev/parport0 (usually lp)
     - "${VIDEO_GID:-44}"

@@ -4,6 +4,7 @@
 #   ./run.sh python flip_trigger_demo.py       # any command in /experiments
 #   LPT_PORT=/dev/parport1 ./run.sh ...        # a different port
 #   RAW=1 LPT_PORT=0xd010 ./run.sh ...         # raw I/O at a base address
+#   IMAGE=<user>/psychopy-parport ./run.sh     # pull from Docker Hub instead of building
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -31,5 +32,9 @@ xhost +local: >/dev/null 2>&1 || echo "warning: xhost failed; windows may not op
 
 if [[ $# -eq 0 ]]; then
     set -- python pin_test.py
+fi
+if [[ -n ${IMAGE:-} ]]; then
+    docker pull "$IMAGE" || echo "warning: pull failed; using local $IMAGE" >&2
+    exec docker compose run --rm "$service" "$@"
 fi
 exec docker compose run --rm --build "$service" "$@"

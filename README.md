@@ -98,7 +98,8 @@ parport0: base-addr 53264	53256  modes PCSPP,TRISTATE,COMPAT,EPP,ECP
 ```
 
 The first run builds the image, which takes **5–15 min** and downloads about
-2 GB. Later runs start in seconds. The default command is `pin_test.py`, which
+2 GB. Later runs start in seconds. To skip the build, see
+[Optional: use the prebuilt image](#optional-use-the-prebuilt-image-from-docker-hub). The default command is `pin_test.py`, which
 sets each data pin high in turn:
 
 ```
@@ -136,6 +137,38 @@ in the container, so edits apply without a rebuild.
 
 Data files your script writes into `/experiments` (e.g. `data/` from
 `ExperimentHandler`) end up in `experiments/` on the host.
+
+### Optional: use the prebuilt image from Docker Hub
+
+Instead of building locally, pull the image that CI publishes on every push to
+`main`. Set `IMAGE` and `run.sh` pulls it and skips the build:
+
+```bash
+export IMAGE=<dockerhub-user>/psychopy-parport:latest
+./run.sh                                       # pin test
+./run.sh python my_experiment.py               # your script from experiments/
+```
+
+Your local `experiments/` folder is still mounted over `/experiments`, so you
+only need this repo folder (for `run.sh`, `docker-compose.yml` and your
+scripts), not a rebuild. To ship a single experiment *inside* the image, e.g.
+for a PC without this repo, add it on top of the published image:
+
+```dockerfile
+# Dockerfile.experiment
+FROM <dockerhub-user>/psychopy-parport:latest
+COPY --chown=experimenter experiments/my_experiment.py /experiments/
+CMD ["python", "my_experiment.py"]
+```
+
+```bash
+docker build -f Dockerfile.experiment -t my-experiment .
+IMAGE=my-experiment ./run.sh                   # pull fails (local-only image), so it uses the local build
+```
+
+`run.sh` still mounts `./experiments` over `/experiments`, so a script that's
+only in the image is hidden when you launch through `run.sh` from a folder
+without it.
 
 ### Sending triggers from your code
 
@@ -242,10 +275,11 @@ Change the PsychoPy version: edit `PSYCHOPY_VERSION` in the `Dockerfile` and rer
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Ubuntu 22.04 + PsychoPy 2024.2.4 + wxPython + pyparallel |
+| `Dockerfile` | Ubuntu 22.04 + PsychoPy 2025.2.4 + wxPython 4.2.2 + pyparallel |
 | `docker-compose.yml` | `psychopy` (ppdev, default) and `psychopy-raw` (I/O ports) services |
 | `lpt.py` | Pin-access library (ppdev or `/dev/port`), copied into the image |
 | `host-setup.sh` | One-time host driver/permissions setup |
-| `run.sh` | Launcher: works out gids, allows X11, picks the mode, runs the command |
+| `run.sh` | Launcher: works out gids, allows X11, picks the mode, runs the command (`IMAGE=` to use a pulled image) |
+| `.github/workflows/docker-publish.yml` | Builds and pushes the image to Docker Hub on pushes to `main` and `v*` tags |
 | `experiments/pin_test.py` | Pin-walk test, no window |
 | `experiments/flip_trigger_demo.py` | PsychoPy demo with triggers locked to screen flips |
