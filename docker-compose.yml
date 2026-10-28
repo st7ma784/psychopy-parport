@@ -1,0 +1,48 @@
+# Run via ./run.sh, which fills in LP_GID / DISPLAY and picks the service.
+x-common: &common
+  build: .
+  image: psychopy-parport:latest
+  group_add:
+    - "${LP_GID:-7}"               # host gid owning /dev/parport0 (usually lp)
+    - "${VIDEO_GID:-44}"
+    - "${AUDIO_GID:-29}"
+  ulimits:
+    rtprio: 99
+  volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - ./experiments:/experiments
+  network_mode: host
+  ipc: host                        # MIT-SHM for X11
+
+services:
+  # Default: kernel ppdev driver, no privileged mode.
+  psychopy:
+    <<: *common
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      LPT_PORT: ${LPT_PORT:-/dev/parport0}
+      XDG_RUNTIME_DIR: /tmp
+    devices:
+      - ${LPT_PORT:-/dev/parport0}:${LPT_PORT:-/dev/parport0}
+      - /dev/dri:/dev/dri          # GPU for OpenGL
+      - /dev/snd:/dev/snd          # audio (delete if the host has none)
+    cap_add:
+      - SYS_NICE                   # lets PsychoPy raise priority for timing
+
+  # Fallback: raw I/O-port access at a base address (LPT_PORT=0x378 etc.).
+  # Runs as root because /dev/port is root-only.
+  psychopy-raw:
+    <<: *common
+    profiles: [raw]
+    user: root
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      LPT_PORT: ${LPT_PORT:-0x378}
+      XDG_RUNTIME_DIR: /tmp
+    devices:
+      - /dev/port:/dev/port
+      - /dev/dri:/dev/dri
+      - /dev/snd:/dev/snd
+    cap_add:
+      - SYS_RAWIO
+      - SYS_NICE
